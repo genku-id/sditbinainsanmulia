@@ -2,36 +2,56 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Konten publik website
+    // Admin tunggal dikenali dari email (belum pakai custom claim).
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'admin@sditbinainsanmulia.sch.id';
+    }
+
+    // ---------- Konten publik website (tulis hanya admin) ----------
     match /schoolProfile/{doc} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
     match /announcements/{doc} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
     match /galleryItems/{doc} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
     match /ppdbOpenings/{doc} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
-    // Pendaftaran PPDB: publik bisa daftar & cek status sendiri;
-    // perubahan status hanya oleh admin (sudah login)
+
+    // ---------- Pendaftaran PPDB ----------
+    // Daftar & cek status boleh publik (fitur status). Ubah/hapus hanya admin.
+    // Catatan: read publik masih membocorkan PII pendaftar; untuk menutup
+    // sepenuhnya butuh server route (Admin SDK) yang memverifikasi nomor.
     match /ppdbRegistrations/{doc} {
       allow create: if true;
       allow read: if true;
-      allow update, delete: if request.auth != null;
+      allow update, delete: if isAdmin();
     }
 
-    // Data operasional aplikasi (guru & orang tua) — wajib login
-    match /users/{uid} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+    // ---------- Users: hanya owner & admin ----------
+    // User hanya boleh baca/tulis doc miliknya sendiri (di-key email).
+    // Field role immutabel bagi non-admin (cegah escalasi jadi admin).
+    match /users/{email} {
+      allow read: if isAdmin() || (request.auth != null && request.auth.token.email == email);
+      allow create: if request.auth != null && (isAdmin() || request.auth.token.email == email);
+      allow update: if request.auth != null && (
+        isAdmin()
+        || (request.auth.token.email == email && request.resource.data.role == resource.data.role)
+      );
+      allow delete: if isAdmin() || (request.auth != null && request.auth.token.email == email);
     }
+
+    // ---------- Data operasional (guru & orang tua, sudah login) ----------
+    // Scoping per-anak sudah dilakukan di sisi client. Enforcing per-role
+    // (mis. ortu hanya baca anak sendiri) butuh custom claim — lihat catatan.
     match /classes/{doc} {
       allow read, write: if request.auth != null;
     }
