@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   listStudents,
@@ -9,12 +10,30 @@ import {
   deleteViolation,
 } from "@/lib/firestore";
 import { useCollection } from "@/lib/hooks";
+import { useAppUser } from "@/lib/useAppUser";
 
 export default function PelanggaranPage() {
+  const { profile, loading } = useAppUser();
+  const router = useRouter();
   const students = useCollection(() => listStudents());
   const violations = useCollection(() => listViolations());
   const [form, setForm] = useState({ studentId: "", type: "", note: "" });
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!profile || (profile.role !== "guru" && profile.role !== "admin")) {
+      router.replace("/app");
+    }
+  }, [loading, profile, router]);
+
+  if (loading || !profile || (profile.role !== "guru" && profile.role !== "admin")) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-stone-500">
+        Memeriksa akses…
+      </div>
+    );
+  }
 
   async function add() {
     if (!form.studentId || !form.type.trim()) return;

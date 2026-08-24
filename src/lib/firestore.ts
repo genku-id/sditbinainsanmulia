@@ -265,11 +265,14 @@ export async function enrollAcceptedRegistration(
     const studentIds = Array.from(
       new Set([...(existing?.studentIds ?? []), studentId]),
     );
+    // Pertahankan role & data lain yang sudah ada; hanya tambahkan anak
+    // yang terhubung agar akun (mis. guru yang juga jadi orang tua) tak
+    // berubah jadi orang_tua.
     await createUserProfile({
       uid: existing?.uid ?? "",
       email: reg.parentEmail,
-      name: reg.fatherName || reg.motherName,
-      role: "orang_tua",
+      name: existing?.name ?? reg.fatherName ?? reg.motherName,
+      role: existing?.role ?? "orang_tua",
       studentIds,
     });
   }

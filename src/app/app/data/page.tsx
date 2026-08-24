@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   listClasses,
   createClass,
@@ -13,6 +14,7 @@ import {
   deleteStudent,
 } from "@/lib/firestore";
 import { useCollection } from "@/lib/hooks";
+import { useAppUser } from "@/lib/useAppUser";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import type { ClassRoom, Student, Subject } from "@/lib/types";
@@ -20,7 +22,24 @@ import type { ClassRoom, Student, Subject } from "@/lib/types";
 type Tab = "kelas" | "mapel" | "siswa";
 
 export default function DataPage() {
+  const { profile, loading } = useAppUser();
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("kelas");
+
+  useEffect(() => {
+    if (loading) return;
+    if (!profile || (profile.role !== "guru" && profile.role !== "admin")) {
+      router.replace("/app");
+    }
+  }, [loading, profile, router]);
+
+  if (loading || !profile || (profile.role !== "guru" && profile.role !== "admin")) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-stone-500">
+        Memeriksa akses…
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">

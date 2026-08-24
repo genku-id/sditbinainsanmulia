@@ -2,24 +2,29 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth";
+import { useAppUser } from "@/lib/useAppUser";
 
 export default function AdminGuard({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, loading } = useAuth();
+  const { profile, role, loading } = useAppUser();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) router.replace("/login");
-  }, [loading, user, router]);
+    if (loading) return;
+    if (!profile) {
+      router.replace("/login");
+    } else if (role !== "admin") {
+      router.replace("/app");
+    }
+  }, [loading, profile, role, router]);
 
-  if (loading || !user) {
+  if (loading || !profile || role !== "admin") {
     return (
       <div className="flex min-h-screen items-center justify-center text-stone-500">
-        Memeriksa sesi…
+        Memeriksa akses…
       </div>
     );
   }
