@@ -53,6 +53,8 @@ export interface AppUser {
   name: string;
   role: AppRole;
   studentIds: string[];
+  // Nomor HP orang tua (struktur persiapan migrasi login ortu ke nomor HP).
+  phone?: string;
 }
 
 export interface ClassRoom {

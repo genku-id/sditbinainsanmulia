@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { getPpdbRegistrationByNumber } from "@/lib/firestore";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/site/PageHeader";
 import { Container } from "@/components/ui/Container";
@@ -28,9 +27,18 @@ export default function PpdbStatusPage() {
     setNotFound(false);
     setData(null);
     try {
-      const res = await getPpdbRegistrationByNumber(number);
-      if (res) setData(res);
+      const res = await fetch(
+        `/api/ppdb/status?number=${encodeURIComponent(number.trim().toUpperCase())}`,
+      );
+      if (res.status === 404) {
+        setNotFound(true);
+        return;
+      }
+      const json = await res.json();
+      if (json.registration) setData(json.registration as PpdbRegistration);
       else setNotFound(true);
+    } catch {
+      setNotFound(true);
     } finally {
       setBusy(false);
     }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { getAuth } from "firebase/auth";
 import {
   listUsers,
   createUserProfile,
@@ -15,6 +16,7 @@ export default function AdminPenggunaPage() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState<AppRole>("guru");
+  const [note, setNote] = useState("");
 
   async function add() {
     if (!email) return;
@@ -25,6 +27,28 @@ export default function AdminPenggunaPage() {
       role,
       studentIds: [],
     });
+    // Stemple custom claim `role` agar Firestore Rules bisa menerapkan RBAC.
+    try {
+      const token = await getAuth().currentUser?.getIdToken();
+      if (token) {
+        const r = await fetch("/api/set-role", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ email, role }),
+        });
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}));
+          setNote(j.error || "Gagal menstempel role (claim).");
+        } else {
+          setNote("");
+        }
+      }
+    } catch {
+      setNote("Gagal menstempel role (claim).");
+    }
     setEmail("");
     setName("");
     users.refresh();
@@ -65,6 +89,14 @@ export default function AdminPenggunaPage() {
           Tambah Pengguna
         </Button>
       </div>
+
+      {note && (
+        <p className="mt-2 text-xs text-amber-700">{note}</p>
+      )}
+      <p className="mt-2 text-xs text-stone-400">
+        Akun harus sudah dibuat di Firebase Authentication (email sama). Role
+        akan distempel otomatis ke token untuk pengamanan rules.
+      </p>
 
       <ul className="mt-6 space-y-2">
         {users.data?.map((u) => (

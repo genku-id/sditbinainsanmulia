@@ -2,10 +2,15 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Admin tunggal dikenali dari email (belum pakai custom claim).
+    // Admin dikenali dari custom claim `role` ATAU fallback email (sampai
+    // semua akun mendapat claim). Ortu dikenali dari claim `role == 'orang_tua'`.
     function isAdmin() {
       return request.auth != null
-        && request.auth.token.email == 'admin@sditbinainsanmulia.sch.id';
+        && (request.auth.token.role == 'admin'
+            || request.auth.token.email == 'admin@sditbinainsanmulia.sch.id');
+    }
+    function notOrtu() {
+      return request.auth != null && request.auth.token.role != 'orang_tua';
     }
 
     // ---------- Konten publik website (tulis hanya admin) ----------
@@ -27,17 +32,13 @@ service cloud.firestore {
     }
 
     // ---------- Pendaftaran PPDB ----------
-    // Daftar & cek status boleh publik (fitur status). Ubah/hapus hanya admin.
-    // Catatan: read publik masih membocorkan PII pendaftar; untuk menutup
-    // sepenuhnya butuh server route (Admin SDK) yang memverifikasi nomor.
+    // Daftar publik. Baca & ubah hanya via server/admin (tutup kebocoran PII).
     match /ppdbRegistrations/{doc} {
       allow create: if true;
-      allow read: if true;
-      allow update, delete: if isAdmin();
+      allow read, update, delete: if isAdmin();
     }
 
     // ---------- Users: hanya owner & admin ----------
-    // User hanya boleh baca/tulis doc miliknya sendiri (di-key email).
     // Field role immutabel bagi non-admin (cegah escalasi jadi admin).
     match /users/{email} {
       allow read: if isAdmin() || (request.auth != null && request.auth.token.email == email);
@@ -49,32 +50,41 @@ service cloud.firestore {
       allow delete: if isAdmin() || (request.auth != null && request.auth.token.email == email);
     }
 
-    // ---------- Data operasional (guru & orang tua, sudah login) ----------
-    // Scoping per-anak sudah dilakukan di sisi client. Enforcing per-role
-    // (mis. ortu hanya baca anak sendiri) butuh custom claim — lihat catatan.
+    // ---------- Data operasional ----------
+    // Baca: semua pengguna login. Tulis: semua kecuali ortu (claim 'orang_tua').
+    // Catatan: akun tanpa claim (belum di-stempel) masih bisa tulis; setelah
+    // claims rollout, peran lebih ketat. Scoping per-anak tetap di sisi client.
     match /classes/{doc} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if notOrtu();
     }
     match /subjects/{doc} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if notOrtu();
     }
     match /students/{doc} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if notOrtu();
     }
     match /attendances/{doc} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if notOrtu();
     }
     match /scores/{doc} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if notOrtu();
     }
     match /violations/{doc} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if notOrtu();
     }
     match /permissions/{doc} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if notOrtu();
     }
     match /schedules/{doc} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if notOrtu();
     }
   }
 }
