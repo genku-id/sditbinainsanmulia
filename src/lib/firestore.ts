@@ -37,6 +37,22 @@ function requireDb() {
   return db;
 }
 
+// Firestore menolak nilai `undefined`. Bersihkan agar field opsional yang tak
+// diisi tidak menggagalkan write.
+function stripUndefined<T>(o: T): T {
+  if (o === null || typeof o !== "object" || Array.isArray(o)) return o;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(o)) {
+    if (v !== undefined) out[k] = v;
+  }
+  return out as T;
+}
+
+async function addDocC(col: string, data: object): Promise<string> {
+  const ref = await addDoc(collection(requireDb(), col), stripUndefined(data));
+  return ref.id;
+}
+
 // ---------- School Profile (single doc "main") ----------
 export async function getSchoolProfile(): Promise<SchoolProfile | null> {
   const d = await getDoc(doc(requireDb(), "schoolProfile", "main"));
@@ -63,8 +79,7 @@ export async function listAnnouncements(publishedOnly = false): Promise<Announce
 export async function createAnnouncement(
   data: Omit<Announcement, "id">,
 ): Promise<string> {
-  const ref = await addDoc(collection(requireDb(), "announcements"), data);
-  return ref.id;
+  return await addDocC("announcements", data);
 }
 
 export async function updateAnnouncement(
@@ -88,8 +103,7 @@ export async function listGallery(): Promise<GalleryItem[]> {
 export async function createGalleryItem(
   data: Omit<GalleryItem, "id">,
 ): Promise<string> {
-  const ref = await addDoc(collection(requireDb(), "galleryItems"), data);
-  return ref.id;
+  return await addDocC("galleryItems", data);
 }
 
 export async function deleteGalleryItem(id: string): Promise<void> {
@@ -105,8 +119,7 @@ export async function listPpdbOpenings(): Promise<PpdbOpening[]> {
 export async function createPpdbOpening(
   data: Omit<PpdbOpening, "id">,
 ): Promise<string> {
-  const ref = await addDoc(collection(requireDb(), "ppdbOpenings"), data);
-  return ref.id;
+  return await addDocC("ppdbOpenings", data);
 }
 
 export async function updatePpdbOpening(
@@ -124,8 +137,7 @@ export async function deletePpdbOpening(id: string): Promise<void> {
 export async function createPpdbRegistration(
   data: Omit<PpdbRegistration, "id">,
 ): Promise<string> {
-  const ref = await addDoc(collection(requireDb(), "ppdbRegistrations"), data);
-  return ref.id;
+  return await addDocC("ppdbRegistrations", data);
 }
 
 export async function getPpdbRegistrationByNumber(
@@ -159,7 +171,7 @@ async function setDocSafe(
   id: string,
   data: object,
 ): Promise<void> {
-  await setDoc(doc(requireDb(), col, id), data);
+  await setDoc(doc(requireDb(), col, id), stripUndefined(data));
 }
 
 // ---------- App Users (role) ----------
@@ -195,7 +207,7 @@ export async function bootstrapAdminIfNeeded(
 
 export async function createUserProfile(profile: AppUser): Promise<void> {
   const id = profile.email.toLowerCase();
-  await setDoc(doc(requireDb(), "users", id), { ...profile, email: id });
+  await setDoc(doc(requireDb(), "users", id), stripUndefined({ ...profile, email: id }));
 }
 
 export async function listUsers(): Promise<AppUser[]> {
@@ -213,8 +225,7 @@ export async function listClasses(): Promise<ClassRoom[]> {
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as ClassRoom) }));
 }
 export async function createClass(data: Omit<ClassRoom, "id">): Promise<string> {
-  const ref = await addDoc(collection(requireDb(), "classes"), data);
-  return ref.id;
+  return await addDocC("classes", data);
 }
 export async function deleteClass(id: string): Promise<void> {
   await deleteDoc(doc(requireDb(), "classes", id));
@@ -225,8 +236,7 @@ export async function listSubjects(): Promise<Subject[]> {
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Subject) }));
 }
 export async function createSubject(data: Omit<Subject, "id">): Promise<string> {
-  const ref = await addDoc(collection(requireDb(), "subjects"), data);
-  return ref.id;
+  return await addDocC("subjects", data);
 }
 export async function deleteSubject(id: string): Promise<void> {
   await deleteDoc(doc(requireDb(), "subjects", id));
@@ -240,8 +250,7 @@ export async function listStudents(): Promise<Student[]> {
 export async function createStudent(
   data: Omit<Student, "id">,
 ): Promise<string> {
-  const ref = await addDoc(collection(requireDb(), "students"), data);
-  return ref.id;
+  return await addDocC("students", data);
 }
 export async function deleteStudent(id: string): Promise<void> {
   await deleteDoc(doc(requireDb(), "students", id));
@@ -293,7 +302,7 @@ export async function listAttendances(): Promise<Attendance[]> {
 // menambah baris baru.
 export async function saveAttendance(data: Omit<Attendance, "id">): Promise<void> {
   const id = `${data.studentId}_${data.date}`;
-  await setDoc(doc(requireDb(), "attendances", id), data);
+  await setDoc(doc(requireDb(), "attendances", id), stripUndefined(data));
 }
 
 // ---------- Scores ----------
@@ -302,8 +311,7 @@ export async function listScores(): Promise<Score[]> {
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Score) }));
 }
 export async function createScore(data: Omit<Score, "id">): Promise<string> {
-  const ref = await addDoc(collection(requireDb(), "scores"), data);
-  return ref.id;
+  return await addDocC("scores", data);
 }
 export async function deleteScore(id: string): Promise<void> {
   await deleteDoc(doc(requireDb(), "scores", id));
@@ -317,8 +325,7 @@ export async function listViolations(): Promise<Violation[]> {
 export async function createViolation(
   data: Omit<Violation, "id">,
 ): Promise<string> {
-  const ref = await addDoc(collection(requireDb(), "violations"), data);
-  return ref.id;
+  return await addDocC("violations", data);
 }
 export async function deleteViolation(id: string): Promise<void> {
   await deleteDoc(doc(requireDb(), "violations", id));
@@ -332,8 +339,7 @@ export async function listPermissions(): Promise<Permission[]> {
 export async function createPermission(
   data: Omit<Permission, "id">,
 ): Promise<string> {
-  const ref = await addDoc(collection(requireDb(), "permissions"), data);
-  return ref.id;
+  return await addDocC("permissions", data);
 }
 export async function updatePermission(
   id: string,
@@ -353,6 +359,5 @@ export async function listSchedules(): Promise<Schedule[]> {
 export async function createSchedule(
   data: Omit<Schedule, "id">,
 ): Promise<string> {
-  const ref = await addDoc(collection(requireDb(), "schedules"), data);
-  return ref.id;
+  return await addDocC("schedules", data);
 }
