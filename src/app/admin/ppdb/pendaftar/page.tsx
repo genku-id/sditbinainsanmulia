@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { getAuth } from "firebase/auth";
 import {
   listPpdbRegistrations,
   updatePpdbRegistration,
@@ -23,8 +24,10 @@ export default function PpdbPendaftarPage() {
   const classes = useCollection<ClassRoom>(() => listClasses());
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [pwMap, setPwMap] = useState<Record<string, string>>({});
   const [classMap, setClassMap] = useState<Record<string, string>>({});
   const [classError, setClassError] = useState<string | null>(null);
+  const [results, setResults] = useState<Record<string, { email: string; password: string }>>({});
 
   async function accept(r: PpdbRegistration) {
     const classId = classMap[r.id ?? ""];
@@ -34,9 +37,41 @@ export default function PpdbPendaftarPage() {
     }
     setBusyId(r.id ?? "");
     try {
-      await enrollAcceptedRegistration(r, classId);
+      // 1) Daftarkan sebagai siswa (sekaligus profil ortu bila ada email).
+      const studentId = await enrollAcceptedRegistration(r, classId);
+
+      // 2) Buat akun login ortu otomatis (Auth + claim + tautkan anak).
+      const ortuEmail =
+        r.parentEmail?.trim().toLowerCase() ||
+        `ortu.${r.registrationNumber.toLowerCase().replace(/[^a-z0-9.@-]/g, "")}@sditbinainsanmulia.sch.id`;
+      const password =
+        pwMap[r.id ?? ""]?.trim() || `Sdit${Math.floor(1000 + Math.random() * 9000)}`;
+      const token = await getAuth().currentUser?.getIdToken();
+      const res = await fetch("/api/admin/create-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: ortuEmail,
+          password,
+          name: r.fatherName || r.motherName || r.studentName,
+          role: "orang_tua",
+          studentId,
+          phone: r.parentPhone,
+        }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "Gagal membuat akun orang tua");
+      }
+
       await updatePpdbRegistration(r.id!, { status: "accepted", notes: notes[r.id ?? ""] || undefined });
+      setResults((s) => ({ ...s, [r.id ?? ""]: { email: ortuEmail, password } }));
       regs.refresh();
+    } catch (e) {
+      setResults((s) => ({ ...s, [r.id ?? ""]: { email: "", password: e instanceof Error ? e.message : "Gagal" } }));
     } finally {
       setBusyId(null);
     }
@@ -91,6 +126,14 @@ export default function PpdbPendaftarPage() {
                 className="mt-3 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm"
               />
               {r.status !== "accepted" && (
+                <input
+                  value={pwMap[r.id ?? ""] ?? ""}
+                  onChange={(e) => setPwMap((s) => ({ ...s, [r.id ?? ""]: e.target.value }))}
+                  placeholder="Password akun ortu (opsional, auto-buat bila kosong)"
+                  className="mt-2 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm"
+                />
+              )}
+              {r.status !== "accepted" && (
                 <label className="mt-3 block">
                   <span className="text-xs font-medium text-stone-600">Masukkan ke kelas</span>
                   <select
@@ -125,6 +168,19 @@ export default function PpdbPendaftarPage() {
                   Tolak
                 </Button>
               </div>
+              {results[r.id ?? ""] && (
+                <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs text-emerald-800">
+                  {results[r.id ?? ""].email ? (
+                    <>
+                      <p className="font-semibold">Akun orang tua dibuat &amp; terhubung ke anak.</p>
+                      <p>Login: <b>{results[r.id ?? ""].email}</b></p>
+                      <p>Password: <b>{results[r.id ?? ""].password}</b> (beritahu ke orang tua)</p>
+                    </>
+                  ) : (
+                    <p className="text-red-700">{results[r.id ?? ""].password}</p>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

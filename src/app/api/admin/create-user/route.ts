@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
     const name = String(body.name || "").trim() || email.split("@")[0];
     const role = String(body.role || "");
     const studentId = String(body.studentId || "").trim() || "";
+    const phone = String(body.phone || "").trim();
 
     if (!ROLES.includes(role as (typeof ROLES)[number])) {
       return NextResponse.json({ error: "Role tidak valid" }, { status: 400 });
@@ -91,6 +92,7 @@ export async function POST(req: NextRequest) {
           name: existing?.name || name,
           role,
           studentIds,
+          ...(phone ? { phone } : {}),
         },
         { merge: true },
       );
