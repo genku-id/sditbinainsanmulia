@@ -2,15 +2,26 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Admin dikenali dari custom claim `role` ATAU fallback email (sampai
-    // semua akun mendapat claim). Ortu dikenali dari claim `role == 'orang_tua'`.
+    // Role diambil dari dokumen users/{email}.role (bukan dari custom claim),
+    // sehingga admin yang sudah punya akun role=admin langsung berhak tulis
+    // tanpa perlu stemple claim. Tidak ada lagi ketergantungan email magic.
+    function userRole() {
+      let e = request.auth.token.email;
+      return request.auth != null && e != null
+        ? (exists(/databases/$(database)/documents/users/$(e))
+            ? get(/databases/$(database)/documents/users/$(e)).data.role
+            : null)
+        : null;
+    }
     function isAdmin() {
-      return request.auth != null
-        && (request.auth.token.role == 'admin'
-            || request.auth.token.email == 'admin@sditbinainsanmulia.sch.id');
+      return request.auth != null && (
+        request.auth.token.role == 'admin'
+        || request.auth.token.email == 'admin@sditbinainsanmulia.sch.id'
+        || userRole() == 'admin'
+      );
     }
     function notOrtu() {
-      return request.auth != null && request.auth.token.role != 'orang_tua';
+      return request.auth != null && userRole() != 'orang_tua';
     }
 
     // ---------- Konten publik website (tulis hanya admin) ----------
@@ -32,28 +43,25 @@ service cloud.firestore {
     }
 
     // ---------- Pendaftaran PPDB ----------
-    // Daftar publik. Baca & ubah hanya via server/admin (tutup kebocoran PII).
     match /ppdbRegistrations/{doc} {
       allow create: if true;
       allow read, update, delete: if isAdmin();
     }
 
     // ---------- Users: hanya owner & admin ----------
-    // Field role immutabel bagi non-admin (cegah escalasi jadi admin).
+    // Read dibuka untuk user login (dibutuhkan rules untuk baca role).
     match /users/{email} {
-      allow read: if isAdmin() || (request.auth != null && request.auth.token.email == email);
+      allow read: if request.auth != null;
       allow create: if request.auth != null && (isAdmin() || request.auth.token.email == email);
       allow update: if request.auth != null && (
         isAdmin()
         || (request.auth.token.email == email && request.resource.data.role == resource.data.role)
       );
-      allow delete: if isAdmin() || (request.auth != null && request.auth.token.email == email);
+      allow delete: if isAdmin() || request.auth.token.email == email;
     }
 
     // ---------- Data operasional ----------
-    // Baca: semua pengguna login. Tulis: semua kecuali ortu (claim 'orang_tua').
-    // Catatan: akun tanpa claim (belum di-stempel) masih bisa tulis; setelah
-    // claims rollout, peran lebih ketat. Scoping per-anak tetap di sisi client.
+    // Baca: semua user login. Tulis: semua kecuali ortu (role orang_tua).
     match /classes/{doc} {
       allow read: if request.auth != null;
       allow write: if notOrtu();
