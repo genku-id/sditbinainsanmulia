@@ -33,7 +33,6 @@ export default function PpdbDaftarPage() {
     fatherName: "",
     motherName: "",
     parentPhone: "",
-    parentEmail: "",
   });
   const [files, setFiles] = useState<{ foto?: File; kk?: File; akta?: File }>({});
   const [busy, setBusy] = useState(false);
@@ -77,7 +76,6 @@ export default function PpdbDaftarPage() {
         fatherName: form.fatherName,
         motherName: form.motherName,
         parentPhone: form.parentPhone,
-        parentEmail: form.parentEmail,
         photoUrl,
         kkUrl,
         aktaUrl,
@@ -167,7 +165,6 @@ export default function PpdbDaftarPage() {
                 <Input label="No. HP Orang Tua" value={form.parentPhone} onChange={(v) => set("parentPhone", v)} />
               </div>
               <Textarea label="Alamat" value={form.address} onChange={(v) => set("address", v)} />
-              <Input label="Email Orang Tua" type="email" value={form.parentEmail} onChange={(v) => set("parentEmail", v)} />
             </section>
 
             {/* Orang tua */}

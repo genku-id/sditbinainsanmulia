@@ -143,7 +143,6 @@ export interface PpdbRegistration {
   fatherName: string;
   motherName: string;
   parentPhone: string;
-  parentEmail: string;
   // Berkas (URL Cloudinary)
   photoUrl?: string;
   kkUrl?: string;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminAuth, getAdminDb } from "@/lib/firebaseAdmin";
+import { ortuEmailFromPhone } from "@/lib/phone";
 
 const ADMIN_EMAIL = "admin@sditbinainsanmulia.sch.id";
 const ROLES = ["admin", "guru", "orang_tua"] as const;
@@ -25,7 +26,8 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const email = String(body.email || "").toLowerCase().trim();
+    const rawEmail = String(body.email || "").toLowerCase().trim();
+    let email = rawEmail;
     const password = String(body.password || "");
     const name = String(body.name || "").trim() || email.split("@")[0];
     const role = String(body.role || "");
@@ -35,8 +37,17 @@ export async function POST(req: NextRequest) {
     if (!ROLES.includes(role as (typeof ROLES)[number])) {
       return NextResponse.json({ error: "Role tidak valid" }, { status: 400 });
     }
-    if (!email || !password) {
-      return NextResponse.json({ error: "Email & password wajib" }, { status: 400 });
+    // Orang tua diidentifikasi dari nomor HP; email diturunkan otomatis.
+    if (role === "orang_tua") {
+      if (!phone) {
+        return NextResponse.json({ error: "Nomor HP wajib untuk orang tua" }, { status: 400 });
+      }
+      if (!email) email = ortuEmailFromPhone(phone);
+    } else if (!email) {
+      return NextResponse.json({ error: "Email wajib" }, { status: 400 });
+    }
+    if (!password) {
+      return NextResponse.json({ error: "Password wajib" }, { status: 400 });
     }
 
     // Ambil & validasi siswa bila orang tua disambungkan ke anak.

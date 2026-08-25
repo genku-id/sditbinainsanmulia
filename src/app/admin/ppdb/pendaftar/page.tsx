@@ -9,6 +9,7 @@ import {
   listClasses,
 } from "@/lib/firestore";
 import { useCollection } from "@/lib/hooks";
+import { ortuEmailFromPhone } from "@/lib/phone";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import type { ClassRoom, PpdbRegistration, PpdbStatus } from "@/lib/types";
@@ -27,7 +28,9 @@ export default function PpdbPendaftarPage() {
   const [pwMap, setPwMap] = useState<Record<string, string>>({});
   const [classMap, setClassMap] = useState<Record<string, string>>({});
   const [classError, setClassError] = useState<string | null>(null);
-  const [results, setResults] = useState<Record<string, { email: string; password: string }>>({});
+  const [results, setResults] = useState<
+    Record<string, { login: string; password: string; phone: boolean }>
+  >({});
 
   async function accept(r: PpdbRegistration) {
     const classId = classMap[r.id ?? ""];
@@ -41,9 +44,8 @@ export default function PpdbPendaftarPage() {
       const studentId = await enrollAcceptedRegistration(r, classId);
 
       // 2) Buat akun login ortu otomatis (Auth + claim + tautkan anak).
-      const ortuEmail =
-        r.parentEmail?.trim().toLowerCase() ||
-        `ortu.${r.registrationNumber.toLowerCase().replace(/[^a-z0-9.@-]/g, "")}@sditbinainsanmulia.sch.id`;
+      // Ortu diidentifikasi dari nomor HP (email turunan, tak ditampilkan).
+      const ortuEmail = r.parentPhone ? ortuEmailFromPhone(r.parentPhone) : "";
       const password =
         pwMap[r.id ?? ""]?.trim() || `Sdit${Math.floor(1000 + Math.random() * 9000)}`;
       const token = await getAuth().currentUser?.getIdToken();
@@ -68,10 +70,10 @@ export default function PpdbPendaftarPage() {
       }
 
       await updatePpdbRegistration(r.id!, { status: "accepted", notes: notes[r.id ?? ""] || undefined });
-      setResults((s) => ({ ...s, [r.id ?? ""]: { email: ortuEmail, password } }));
+      setResults((s) => ({ ...s, [r.id ?? ""]: { login: r.parentPhone, password, phone: true } }));
       regs.refresh();
     } catch (e) {
-      setResults((s) => ({ ...s, [r.id ?? ""]: { email: "", password: e instanceof Error ? e.message : "Gagal" } }));
+      setResults((s) => ({ ...s, [r.id ?? ""]: { login: "", password: e instanceof Error ? e.message : "Gagal", phone: false } }));
     } finally {
       setBusyId(null);
     }
@@ -116,7 +118,6 @@ export default function PpdbPendaftarPage() {
               <div className="mt-2 grid gap-x-6 gap-y-1 text-sm text-stone-600 sm:grid-cols-2">
                 <p>NISN: {r.nisn || "—"}</p>
                 <p>HP: {r.parentPhone}</p>
-                <p>Email: {r.parentEmail}</p>
                 <p>Ayah/Ibu: {r.fatherName} / {r.motherName}</p>
               </div>
               <input
@@ -170,10 +171,10 @@ export default function PpdbPendaftarPage() {
               </div>
               {results[r.id ?? ""] && (
                 <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs text-emerald-800">
-                  {results[r.id ?? ""].email ? (
+                  {results[r.id ?? ""].login ? (
                     <>
                       <p className="font-semibold">Akun orang tua dibuat &amp; terhubung ke anak.</p>
-                      <p>Login: <b>{results[r.id ?? ""].email}</b></p>
+                      <p>{results[r.id ?? ""].phone ? "Nomor HP" : "Login"}: <b>{results[r.id ?? ""].login}</b></p>
                       <p>Password: <b>{results[r.id ?? ""].password}</b> (beritahu ke orang tua)</p>
                     </>
                   ) : (

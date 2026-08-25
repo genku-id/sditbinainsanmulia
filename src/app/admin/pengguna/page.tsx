@@ -18,6 +18,7 @@ export default function AdminPenggunaPage() {
   const [role, setRole] = useState<AppRole>("guru");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [studentQuery, setStudentQuery] = useState("");
   const [pickedStudent, setPickedStudent] = useState<Student | null>(null);
@@ -52,11 +53,12 @@ export default function AdminPenggunaPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          email,
+          email: role === "orang_tua" ? "" : email,
           password,
-          name: name || email.split("@")[0],
+          name: name || (role === "orang_tua" ? phone : email.split("@")[0]),
           role,
           studentId: pickedStudent?.id ?? "",
+          phone: role === "orang_tua" ? phone : "",
         }),
       });
       const json = await res.json();
@@ -67,11 +69,12 @@ export default function AdminPenggunaPage() {
           ok: true,
           text: `Akun ${role === "guru" ? "guru" : "orang tua"} dibuat. ${
             pickedStudent ? `Tersambung ke ${pickedStudent.name}.` : ""
-          } Login: ${email}`,
+          } ${role === "orang_tua" ? `Login: ${phone}` : `Login: ${email}`}`,
         });
         setEmail("");
         setPassword("");
         setName("");
+        setPhone("");
         setStudentQuery("");
         setPickedStudent(null);
         users.refresh();
@@ -112,9 +115,11 @@ export default function AdminPenggunaPage() {
           />
         </div>
         <input
-          placeholder="Email login"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          placeholder={role === "orang_tua" ? "Nomor HP orang tua" : "Email login"}
+          value={role === "orang_tua" ? phone : email}
+          onChange={(e) =>
+            role === "orang_tua" ? setPhone(e.target.value) : setEmail(e.target.value)
+          }
           className="rounded-lg border border-stone-300 px-3 py-2 text-sm"
         />
         <input
@@ -186,7 +191,7 @@ export default function AdminPenggunaPage() {
           >
             <div>
               <p className="font-medium text-stone-800">{u.name}</p>
-              <p className="text-xs text-stone-500">{u.email}</p>
+              <p className="text-xs text-stone-500">{u.phone || u.email}</p>
               {u.studentIds?.length > 0 && (
                 <p className="text-xs text-sky-600">{u.studentIds.length} anak terhubung</p>
               )}

@@ -12,6 +12,7 @@ import {
   query,
   where,
 } from "firebase/firestore";
+import { ortuEmailFromPhone } from "./phone";
 import type {
   Announcement,
   AppUser,
@@ -253,15 +254,16 @@ export async function enrollAcceptedRegistration(
   reg: PpdbRegistration,
   classId: string,
 ): Promise<string> {
+  const ortuEmail = reg.parentPhone ? ortuEmailFromPhone(reg.parentPhone) : "";
   const studentId = await createStudent({
     nis: reg.nisn,
     name: reg.studentName,
     classId,
-    parentId: reg.parentEmail || undefined,
+    parentId: ortuEmail || undefined,
   });
 
-  if (reg.parentEmail) {
-    const existing = await getUserProfile(reg.parentEmail);
+  if (ortuEmail) {
+    const existing = await getUserProfile(ortuEmail);
     const studentIds = Array.from(
       new Set([...(existing?.studentIds ?? []), studentId]),
     );
@@ -270,10 +272,11 @@ export async function enrollAcceptedRegistration(
     // berubah jadi orang_tua.
     await createUserProfile({
       uid: existing?.uid ?? "",
-      email: reg.parentEmail,
+      email: ortuEmail,
       name: existing?.name ?? reg.fatherName ?? reg.motherName,
       role: existing?.role ?? "orang_tua",
       studentIds,
+      ...(reg.parentPhone ? { phone: reg.parentPhone } : {}),
     });
   }
 
